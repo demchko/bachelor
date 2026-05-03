@@ -1,10 +1,14 @@
 'use client';
 
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import PasswordStrengthIndicator from '@/app/components/PasswordStrengthIndicator';
+import { useAuth } from '@/lib/auth-context';
 
 export default function RegisterPage() {
+  const router = useRouter();
+  const { register } = useAuth();
   const [formData, setFormData] = useState({
     firstName: '',
     lastName: '',
@@ -16,23 +20,32 @@ export default function RegisterPage() {
   const [agreeToTerms, setAgreeToTerms] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    // Validation
+    setError('');
+
     if (formData.password !== formData.confirmPassword) {
-      alert('Паролі не збігаються!');
+      setError('Паролі не збігаються!');
       return;
     }
-    
+
     if (!agreeToTerms) {
-      alert('Потрібно погодитись з умовами використання');
+      setError('Потрібно погодитись з умовами використання');
       return;
     }
-    
-    // TODO: Add registration logic
-    console.log('Registration submitted:', formData);
+
+    setLoading(true);
+    try {
+      await register(formData.email, formData.password);
+      router.push(`/verify-email?email=${encodeURIComponent(formData.email)}`);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Помилка реєстрації');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const passwordsMatch = formData.confirmPassword && formData.password === formData.confirmPassword;
@@ -71,6 +84,12 @@ export default function RegisterPage() {
         </button>
       </div>
 
+      {error && (
+        <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
+          {error}
+        </div>
+      )}
+
       {/* Registration Form */}
       <form onSubmit={handleSubmit} className="space-y-5">
         {/* Name Fields */}
@@ -86,7 +105,7 @@ export default function RegisterPage() {
               value={formData.firstName}
               onChange={(e) => setFormData({ ...formData, firstName: e.target.value })}
               placeholder="Іван"
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent outline-none transition"
+              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent outline-none transition text-gray-900 placeholder:text-gray-400"
               required
             />
           </div>
@@ -102,7 +121,7 @@ export default function RegisterPage() {
               value={formData.lastName}
               onChange={(e) => setFormData({ ...formData, lastName: e.target.value })}
               placeholder="Іваненко"
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent outline-none transition"
+              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent outline-none transition text-gray-900 placeholder:text-gray-400"
               required
             />
           </div>
@@ -125,7 +144,7 @@ export default function RegisterPage() {
               value={formData.email}
               onChange={(e) => setFormData({ ...formData, email: e.target.value })}
               placeholder="student@lpnu.ua"
-              className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent outline-none transition"
+              className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent outline-none transition text-gray-900 placeholder:text-gray-400"
               required
             />
           </div>
@@ -144,7 +163,7 @@ export default function RegisterPage() {
               id="role"
               value={formData.role}
               onChange={(e) => setFormData({ ...formData, role: e.target.value })}
-              className="w-full pl-12 pr-10 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent outline-none transition appearance-none bg-white cursor-pointer"
+              className="w-full pl-12 pr-10 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent outline-none transition appearance-none bg-white cursor-pointer text-gray-900"
               required
             >
               <option value="student">Студент</option>
@@ -177,7 +196,7 @@ export default function RegisterPage() {
               value={formData.password}
               onChange={(e) => setFormData({ ...formData, password: e.target.value })}
               placeholder="••••••"
-              className="w-full pl-10 pr-12 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent outline-none transition"
+              className="w-full pl-10 pr-12 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent outline-none transition text-gray-900 placeholder:text-gray-400"
               required
               minLength={6}
             />
@@ -218,7 +237,7 @@ export default function RegisterPage() {
               value={formData.confirmPassword}
               onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })}
               placeholder="••••••"
-              className={`w-full pl-10 pr-12 py-3 border rounded-lg focus:ring-2 focus:border-transparent outline-none transition ${
+              className={`w-full pl-10 pr-12 py-3 border rounded-lg focus:ring-2 focus:border-transparent outline-none transition text-gray-900 placeholder:text-gray-400 ${
                 passwordsDontMatch 
                   ? 'border-red-500 focus:ring-red-500' 
                   : passwordsMatch 
@@ -277,10 +296,10 @@ export default function RegisterPage() {
         {/* Submit Button */}
         <button
           type="submit"
+          disabled={loading || !agreeToTerms || !!passwordsDontMatch}
           className="w-full bg-orange-500 hover:bg-orange-600 text-white font-semibold py-3 px-4 rounded-lg transition duration-200 shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed"
-          disabled={!agreeToTerms || !!passwordsDontMatch}
         >
-          Створити акаунт
+          {loading ? 'Реєстрація...' : 'Створити акаунт'}
         </button>
 
         {/* Sign In Link */}
