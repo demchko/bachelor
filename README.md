@@ -36,6 +36,8 @@ Base URL: `http://localhost:3000/api`
 - `POST /auth/register`
 - `POST /auth/verify-email`
 - `POST /auth/resend-verification`
+- `POST /auth/forgot-password`
+- `POST /auth/reset-password`
 - `POST /auth/login`
 - `POST /auth/refresh`
 - `POST /auth/logout`

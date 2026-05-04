@@ -49,4 +49,31 @@ export class UsersService {
       },
     });
   }
+
+  updatePasswordResetToken(
+    userId: string,
+    tokenHash: string | null,
+    expiresAt: Date | null,
+  ): Promise<User> {
+    return this.prisma.user.update({
+      where: { id: userId },
+      data: {
+        passwordResetTokenHash: tokenHash,
+        passwordResetExpiresAt: expiresAt,
+      },
+    });
+  }
+
+  /** Sets new password, clears reset fields, invalidates existing refresh sessions. */
+  updatePasswordFromReset(userId: string, passwordHash: string): Promise<User> {
+    return this.prisma.user.update({
+      where: { id: userId },
+      data: {
+        passwordHash,
+        passwordResetTokenHash: null,
+        passwordResetExpiresAt: null,
+        refreshTokenHash: null,
+      },
+    });
+  }
 }

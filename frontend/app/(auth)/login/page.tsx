@@ -18,6 +18,7 @@ function LoginForm() {
   const [loading, setLoading] = useState(false);
 
   const verified = searchParams.get('verified') === '1';
+  const passwordReset = searchParams.get('reset') === '1';
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -56,6 +57,12 @@ function LoginForm() {
       {verified && (
         <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-lg text-sm text-green-700">
           Email підтверджено. Тепер ви можете увійти.
+        </div>
+      )}
+
+      {passwordReset && (
+        <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-lg text-sm text-green-700">
+          Пароль оновлено. Увійдіть з новим паролем.
         </div>
       )}
 
@@ -147,7 +154,7 @@ function LoginForm() {
             href="/forgot-password" 
             className="text-sm text-orange-500 hover:text-orange-600 font-medium"
           >
-            Забули пароль?
+            Забули пароль / немає листа
           </Link>
         </div>
 

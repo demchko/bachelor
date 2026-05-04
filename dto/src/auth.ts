@@ -13,6 +13,16 @@ export type VerifyEmailRequestDto = {
   token: string;
 };
 
+export type ForgotPasswordRequestDto = {
+  email: string;
+};
+
+export type ResetPasswordRequestDto = {
+  email: string;
+  token: string;
+  password: string;
+};
+
 export type RefreshRequestDto = {
   refreshToken: string;
 };

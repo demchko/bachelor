@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import PasswordStrengthIndicator from '@/app/components/PasswordStrengthIndicator';
 import { useAuth } from '@/lib/auth-context';
 
@@ -22,6 +22,14 @@ export default function RegisterPage() {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    const emailFromUrl = new URLSearchParams(window.location.search).get('email');
+    if (emailFromUrl) {
+      const decoded = decodeURIComponent(emailFromUrl).trim();
+      setFormData((prev) => ({ ...prev, email: decoded }));
+    }
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

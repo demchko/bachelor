@@ -10,8 +10,10 @@ import * as argon2 from 'argon2';
 import { randomBytes } from 'crypto';
 import { MailerService } from '../mailer/mailer.service';
 import { UsersService } from '../users/users.service';
+import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
+import { ResetPasswordDto } from './dto/reset-password.dto';
 import { VerifyEmailDto } from './dto/verify-email.dto';
 
 type TokenPair = {
@@ -34,7 +36,9 @@ export class AuthService {
 
     const existing = await this.usersService.findByEmail(email);
     if (existing) {
-      throw new BadRequestException('Email is already registered.');
+      throw new BadRequestException(
+        'Ця email-адреса вже зареєстрована. Спробуйте увійти або натисніть «Забули пароль» — на пошту надійде лист для входу.',
+      );
     }
 
     const passwordHash = await argon2.hash(dto.password);
@@ -48,7 +52,7 @@ export class AuthService {
     await this.mailerService.sendVerificationEmail(user.email, verificationToken);
 
     return {
-      message: 'Registration successful. Please verify your email.',
+      message: 'Реєстрація успішна. Перевірте пошту та відкрийте посилання з листа, щоб активувати акаунт.',
     };
   }
 
@@ -57,20 +61,26 @@ export class AuthService {
     const user = await this.usersService.findByEmail(email);
 
     if (!user || !user.emailVerificationTokenHash || !user.emailVerificationExpiresAt) {
-      throw new BadRequestException('Invalid verification request.');
+      throw new BadRequestException(
+        'Посилання недійсне або вже використане. Запросіть новий лист підтвердження.',
+      );
     }
 
     if (user.emailVerificationExpiresAt.getTime() < Date.now()) {
-      throw new BadRequestException('Verification token expired.');
+      throw new BadRequestException(
+        'Термін дії посилання вичерпано. Натисніть «Надіслати лист повторно» або зареєструйтесь знову.',
+      );
     }
 
     const isMatch = await argon2.verify(user.emailVerificationTokenHash, dto.token);
     if (!isMatch) {
-      throw new BadRequestException('Invalid verification token.');
+      throw new BadRequestException(
+        'Недійсний код підтвердження. Запросіть новий лист або перевірте посилання з останнього листа.',
+      );
     }
 
     await this.usersService.markEmailVerified(user.id);
-    return { message: 'Email verified successfully.' };
+    return { message: 'Email успішно підтверджено.' };
   }
 
   async resendVerification(emailRaw: string) {
@@ -79,17 +89,83 @@ export class AuthService {
 
     const user = await this.usersService.findByEmail(email);
     if (!user) {
-      return { message: 'If the email exists, a verification email has been sent.' };
+      throw new BadRequestException(
+        'Облікового запису з цією адресою немає. Перевірте написання або зареєструйтесь.',
+      );
     }
 
     if (user.isEmailVerified) {
-      return { message: 'Email is already verified.' };
+      return { message: 'Email уже підтверджено — можете увійти.' };
     }
 
     const verificationToken = this.createVerificationToken();
     await this.setVerificationToken(user.id, verificationToken);
     await this.mailerService.sendVerificationEmail(user.email, verificationToken);
-    return { message: 'Verification email sent.' };
+    return { message: 'Лист із посиланням надіслано. Перевірте пошту.' };
+  }
+
+  async forgotPassword(dto: ForgotPasswordDto) {
+    const email = dto.email.toLowerCase();
+    const user = await this.usersService.findByEmail(email);
+
+    if (!user) {
+      throw new BadRequestException('Користувача з такою email-адресою не знайдено.');
+    }
+    if (!user.isActive) {
+      throw new BadRequestException('Обліковий запис вимкнено. Зверніться до підтримки.');
+    }
+
+    const inboxHint =
+      'Перевірте пошту та папку «Спам»: надіслано лист із посиланням для входу в систему.';
+
+    // Неактивований акаунт: той самий «Забули пароль» надсилає лист активації (як після реєстрації)
+    if (!user.isEmailVerified) {
+      const verificationToken = this.createVerificationToken();
+      await this.setVerificationToken(user.id, verificationToken);
+      try {
+        await this.mailerService.sendVerificationEmail(user.email, verificationToken, {
+          mustDeliver: true,
+        });
+      } catch (err) {
+        await this.usersService.updateEmailVerificationToken(user.id, null, null);
+        throw err;
+      }
+      return { message: inboxHint };
+    }
+
+    const token = this.createVerificationToken();
+    await this.setPasswordResetToken(user.id, token);
+    try {
+      await this.mailerService.sendPasswordResetEmail(user.email, token);
+    } catch (err) {
+      await this.usersService.updatePasswordResetToken(user.id, null, null);
+      throw err;
+    }
+
+    return { message: inboxHint };
+  }
+
+  async resetPassword(dto: ResetPasswordDto) {
+    const email = dto.email.toLowerCase();
+    const user = await this.usersService.findByEmail(email);
+
+    if (!user || !user.passwordResetTokenHash || !user.passwordResetExpiresAt) {
+      throw new BadRequestException('Посилання для скидання пароля недійсне. Запросіть нове.');
+    }
+
+    if (user.passwordResetExpiresAt.getTime() < Date.now()) {
+      throw new BadRequestException('Посилання для скидання пароля застаріло. Запросіть нове.');
+    }
+
+    const isMatch = await argon2.verify(user.passwordResetTokenHash, dto.token);
+    if (!isMatch) {
+      throw new BadRequestException('Посилання для скидання пароля недійсне.');
+    }
+
+    const passwordHash = await argon2.hash(dto.password);
+    await this.usersService.updatePasswordFromReset(user.id, passwordHash);
+
+    return { message: 'Пароль оновлено. Тепер можете увійти.' };
   }
 
   async login(dto: LoginDto) {
@@ -106,7 +182,9 @@ export class AuthService {
     }
 
     if (!user.isEmailVerified) {
-      throw new ForbiddenException('Email is not verified.');
+      throw new ForbiddenException(
+        'Спочатку активуйте акаунт за посиланням з пошти або натисніть «Забули пароль», щоб отримати новий лист.',
+      );
     }
 
     const tokens = await this.issueTokens(user.id, user.email);
@@ -165,6 +243,16 @@ export class AuthService {
     const ttlHours = Number(this.configService.get<string>('EMAIL_VERIFICATION_TTL_HOURS') ?? 24);
     const expiresAt = new Date(Date.now() + ttlHours * 60 * 60 * 1000);
     await this.usersService.updateEmailVerificationToken(
+      userId,
+      await argon2.hash(token),
+      expiresAt,
+    );
+  }
+
+  private async setPasswordResetToken(userId: string, token: string): Promise<void> {
+    const ttlHours = Number(this.configService.get<string>('PASSWORD_RESET_TTL_HOURS') ?? 1);
+    const expiresAt = new Date(Date.now() + ttlHours * 60 * 60 * 1000);
+    await this.usersService.updatePasswordResetToken(
       userId,
       await argon2.hash(token),
       expiresAt,
