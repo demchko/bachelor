@@ -1,4 +1,11 @@
-import { ComingSoon } from '@/app/components/ComingSoon';
+import CodePlayground from '@/app/components/CodePlayground';
+
 export default function VectorCodesPage() {
-  return <ComingSoon title="Векторні коди" description="Побудова та аналіз векторних кодів на основі ІКВ." from="Генератор ІКВ" />;
+  return (
+    <CodePlayground
+      title="Векторні (монолітні) ІКВ-коди"
+      description="Монолітне кодування ІКВ — пакети однойменних символів, мажоритарне виправлення помилок."
+      kind="monolithic"
+    />
+  );
 }

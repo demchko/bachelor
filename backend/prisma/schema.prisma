@@ -21,5 +21,62 @@ model User {
   createdAt                  DateTime @default(now())
   updatedAt                  DateTime @updatedAt
 
+  irbConfigs       IrbConfig[]
+  simulationRuns   SimulationRun[]
+  testAttempts     TestAttempt[]
+
   @@index([createdAt])
+}
+
+/// Saved Ideal Ring Bundle (IRB) configuration generated or validated by user.
+model IrbConfig {
+  id         String   @id @default(uuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  n          Int
+  r          Int
+  s          Int
+  sequence   Int[]
+  isValid    Boolean
+  source     String   // "generator" | "manual" | "preset"
+  label      String?
+  createdAt  DateTime @default(now())
+
+  @@index([userId, createdAt])
+}
+
+/// Persisted run of noisy-channel simulation for IRB / binary / Reed-Solomon comparison.
+model SimulationRun {
+  id              String   @id @default(uuid())
+  userId          String
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  codeKind        String   // "irb-cyclic" | "irb-monolithic" | "binary" | "reed-solomon"
+  irbSequence     Int[]
+  packets         Int
+  errorProbability Float
+  totalBits       Int
+  bitErrors       Int
+  successfulPackets Int
+  recoveredPackets Int
+  bitFlipRate     Float
+  successRate     Float
+  comparisons     Json?    // optional side-by-side comparison data
+  createdAt       DateTime @default(now())
+
+  @@index([userId, createdAt])
+}
+
+/// User attempt of theoretical IRB test (multiple-choice quiz).
+model TestAttempt {
+  id          String   @id @default(uuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  total       Int
+  correct     Int
+  scorePct    Float
+  answers     Json     // [{ questionId, optionIndex, isCorrect }]
+  durationSec Int?
+  createdAt   DateTime @default(now())
+
+  @@index([userId, createdAt])
 }

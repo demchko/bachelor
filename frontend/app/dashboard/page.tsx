@@ -2,7 +2,9 @@
 
 import AppLayout from '@/app/components/AppLayout';
 import { useAuth } from '@/lib/auth-context';
+import { statsApi, type UserStats } from '@/lib/api';
 import Link from 'next/link';
+import { useEffect, useState } from 'react';
 
 const quickLinks = [
   {
@@ -53,17 +55,43 @@ const quickLinks = [
   },
 ];
 
-const stats = [
-  { label: 'Тестів пройдено', value: '0', sub: 'з 12 доступних' },
-  { label: 'Конфігурацій створено', value: '0', sub: 'ІКВ-генератор' },
-  { label: 'Симуляцій запущено', value: '0', sub: 'за весь час' },
-];
+function formatStats(stats: UserStats | null) {
+  return [
+    {
+      label: 'Тестів пройдено',
+      value: stats ? String(stats.testsCompleted) : '—',
+      sub: stats
+        ? `найкращий результат ${stats.bestTestScorePct ?? 0}%`
+        : 'завантаження…',
+    },
+    {
+      label: 'Конфігурацій створено',
+      value: stats ? String(stats.configsGenerated) : '—',
+      sub: 'ІКВ-генератор',
+    },
+    {
+      label: 'Симуляцій запущено',
+      value: stats ? String(stats.simulationsRan) : '—',
+      sub: 'за весь час',
+    },
+  ];
+}
 
 export default function DashboardPage() {
-  const { user } = useAuth();
+  const { user, accessToken } = useAuth();
+  const [stats, setStats] = useState<UserStats | null>(null);
+
+  useEffect(() => {
+    if (!accessToken) return;
+    statsApi
+      .me(accessToken)
+      .then(setStats)
+      .catch(() => setStats(null));
+  }, [accessToken]);
 
   const firstName = user?.email?.split('.')[0] ?? 'Користувач';
   const displayName = firstName.charAt(0).toUpperCase() + firstName.slice(1);
+  const renderedStats = formatStats(stats);
 
   return (
     <AppLayout>
@@ -79,7 +107,7 @@ export default function DashboardPage() {
       <main className="flex-1 px-8 py-8">
         {/* Stats row */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
-          {stats.map((s) => (
+          {renderedStats.map((s) => (
             <div key={s.label} className="bg-white rounded-xl border border-gray-200 px-6 py-5">
               <p className="text-xs font-semibold uppercase tracking-widest text-gray-400 mb-1">
                 {s.label}

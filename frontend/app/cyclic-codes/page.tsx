@@ -1,4 +1,11 @@
-import { ComingSoon } from '@/app/components/ComingSoon';
+import CodePlayground from '@/app/components/CodePlayground';
+
 export default function CyclicCodesPage() {
-  return <ComingSoon title="Циклічні коди" description="Побудова та аналіз циклічних кодів на основі ІКВ." from="Генератор ІКВ" />;
+  return (
+    <CodePlayground
+      title="Циклічні ІКВ-коди"
+      description="Кодування, моделювання помилок та декодування циклічних завадостійких ІКВ-кодів."
+      kind="cyclic"
+    />
+  );
 }
