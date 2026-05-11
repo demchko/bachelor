@@ -55,7 +55,7 @@ export class MailerService implements OnModuleInit {
     const mustDeliver = opts?.mustDeliver === true;
     const from = this.configService.get<string>('MAIL_FROM') ?? 'no-reply@lpnu.ua';
     const frontendBaseUrl =
-      this.configService.get<string>('FRONTEND_URL') ?? 'http://localhost:3001';
+      this.configService.get<string>('FRONTEND_URL') ?? 'http://localhost:3000';
     const verifyUrl = `${frontendBaseUrl}/verify-email?token=${encodeURIComponent(
       token,
     )}&email=${encodeURIComponent(email)}`;
@@ -108,7 +108,7 @@ export class MailerService implements OnModuleInit {
   async sendPasswordResetEmail(email: string, token: string): Promise<void> {
     const from = this.configService.get<string>('MAIL_FROM') ?? 'no-reply@lpnu.ua';
     const frontendBaseUrl =
-      this.configService.get<string>('FRONTEND_URL') ?? 'http://localhost:3001';
+      this.configService.get<string>('FRONTEND_URL') ?? 'http://localhost:3000';
     const resetUrl = `${frontendBaseUrl}/reset-password?token=${encodeURIComponent(
       token,
     )}&email=${encodeURIComponent(email)}`;

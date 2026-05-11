@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState } from 'react';
+import { useMutation } from '@tanstack/react-query';
 import AppLayout from '@/app/components/AppLayout';
 import {
   simulationApi,
@@ -114,17 +115,12 @@ export default function SimulationPage() {
   const [compareBinary, setCompareBinary] = useState(true);
   const [compareRS, setCompareRS] = useState(false);
   const [sim, setSim] = useState<SimulationResult | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
   const option = CODE_OPTIONS[optionIdx];
 
-  const handleRun = useCallback(async () => {
-    if (!accessToken) return;
-    setLoading(true);
-    setError(null);
-    try {
-      const result = await simulationApi.run(accessToken, {
+  const runMutation = useMutation({
+    mutationFn: () =>
+      simulationApi.run(accessToken!, {
         sequence: option.sequence,
         packets: totalPackets,
         errorProbability: errorProb,
@@ -132,14 +128,12 @@ export default function SimulationPage() {
         compareBinary,
         compareReedSolomon: compareRS,
         save: true,
-      });
-      setSim(result);
-    } catch (err) {
-      setError((err as Error).message);
-    } finally {
-      setLoading(false);
-    }
-  }, [accessToken, option, totalPackets, errorProb, compareBinary, compareRS]);
+      }),
+    onSuccess: setSim,
+  });
+
+  const loading = runMutation.isPending;
+  const error = runMutation.error?.message ?? null;
 
   const errorPct = Math.round(errorProb * 100);
   const presets = [5, 15, 30];
@@ -260,7 +254,7 @@ export default function SimulationPage() {
 
             <div>
               <button
-                onClick={handleRun}
+                onClick={() => runMutation.mutate()}
                 disabled={loading}
                 className="w-full bg-orange-500 hover:bg-orange-600 text-white font-semibold py-3 rounded-lg transition shadow-sm disabled:opacity-60"
               >

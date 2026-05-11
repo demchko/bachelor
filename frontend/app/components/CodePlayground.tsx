@@ -1,6 +1,7 @@
 'use client';
 
-import { useCallback, useState } from 'react';
+import { useState } from 'react';
+import { useMutation } from '@tanstack/react-query';
 import AppLayout from '@/app/components/AppLayout';
 import {
   codesApi,
@@ -34,56 +35,43 @@ export default function CodePlayground({ title, description, kind }: Props) {
   const [efficiency, setEfficiency] = useState<EfficiencyResult | null>(null);
   const [n, setN] = useState(10);
   const [r, setR] = useState(2);
-  const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
 
   const sequence = sequenceText
     .split(',')
     .map((s) => parseInt(s.trim(), 10))
     .filter((v) => Number.isFinite(v) && v > 0);
 
-  const handleEncode = useCallback(async () => {
-    if (!accessToken) return;
-    setError(null);
-    setLoading(true);
-    try {
+  const encodeMutation = useMutation({
+    mutationFn: () => {
       const fn = kind === 'cyclic' ? codesApi.cyclicEncode : codesApi.monolithicEncode;
-      const result = await fn(accessToken, sequence, data);
+      return fn(accessToken!, sequence, data);
+    },
+    onSuccess: (result) => {
       setEncoded(result);
       setReceived(result.codeword);
       setDecoded(null);
-    } catch (err) {
-      setError((err as Error).message);
-    } finally {
-      setLoading(false);
-    }
-  }, [accessToken, sequence, data, kind]);
+    },
+  });
 
-  const handleDecode = useCallback(async () => {
-    if (!accessToken || !encoded) return;
-    setError(null);
-    setLoading(true);
-    try {
+  const decodeMutation = useMutation({
+    mutationFn: () => {
       const fn = kind === 'cyclic' ? codesApi.cyclicDecode : codesApi.monolithicDecode;
-      const result = await fn(accessToken, sequence, received, encoded.codeword);
-      setDecoded(result);
-    } catch (err) {
-      setError((err as Error).message);
-    } finally {
-      setLoading(false);
-    }
-  }, [accessToken, sequence, received, encoded, kind]);
+      return fn(accessToken!, sequence, received, encoded?.codeword);
+    },
+    onSuccess: setDecoded,
+  });
 
-  const handleEfficiency = useCallback(async () => {
-    if (!accessToken) return;
-    setError(null);
-    try {
-      const result = await codesApi.efficiency(accessToken, n, r, kind);
-      setEfficiency(result);
-    } catch (err) {
-      setError((err as Error).message);
-    }
-  }, [accessToken, n, r, kind]);
+  const efficiencyMutation = useMutation({
+    mutationFn: () => codesApi.efficiency(accessToken!, n, r, kind),
+    onSuccess: setEfficiency,
+  });
+
+  const loading = encodeMutation.isPending || decodeMutation.isPending || efficiencyMutation.isPending;
+  const error =
+    encodeMutation.error?.message ??
+    decodeMutation.error?.message ??
+    efficiencyMutation.error?.message ??
+    null;
 
   const introduceError = (idx: number) => {
     if (received) setReceived(flipBit(received, idx));
@@ -120,7 +108,7 @@ export default function CodePlayground({ title, description, kind }: Props) {
           </div>
 
           <button
-            onClick={handleEncode}
+            onClick={() => encodeMutation.mutate()}
             disabled={loading || sequence.length < 2}
             className="bg-orange-500 hover:bg-orange-600 text-white font-semibold px-6 py-2.5 rounded-lg transition disabled:opacity-50"
           >
@@ -168,7 +156,7 @@ export default function CodePlayground({ title, description, kind }: Props) {
             </div>
 
             <button
-              onClick={handleDecode}
+              onClick={() => decodeMutation.mutate()}
               disabled={loading}
               className="bg-blue-500 hover:bg-blue-600 text-white font-semibold px-6 py-2.5 rounded-lg transition disabled:opacity-50"
             >
@@ -232,7 +220,7 @@ export default function CodePlayground({ title, description, kind }: Props) {
             </div>
             <div className="flex items-end">
               <button
-                onClick={handleEfficiency}
+                onClick={() => efficiencyMutation.mutate()}
                 className="w-full bg-emerald-500 hover:bg-emerald-600 text-white font-semibold px-6 py-2.5 rounded-lg transition"
               >
                 Розрахувати

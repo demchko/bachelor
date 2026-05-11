@@ -4,7 +4,7 @@ import AppLayout from '@/app/components/AppLayout';
 import { useAuth } from '@/lib/auth-context';
 import { statsApi, type UserStats } from '@/lib/api';
 import Link from 'next/link';
-import { useEffect, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 
 const quickLinks = [
   {
@@ -79,19 +79,15 @@ function formatStats(stats: UserStats | null) {
 
 export default function DashboardPage() {
   const { user, accessToken } = useAuth();
-  const [stats, setStats] = useState<UserStats | null>(null);
-
-  useEffect(() => {
-    if (!accessToken) return;
-    statsApi
-      .me(accessToken)
-      .then(setStats)
-      .catch(() => setStats(null));
-  }, [accessToken]);
+  const { data: stats } = useQuery({
+    queryKey: ['stats-me', accessToken],
+    queryFn: () => statsApi.me(accessToken!),
+    enabled: !!accessToken,
+  });
 
   const firstName = user?.email?.split('.')[0] ?? 'Користувач';
   const displayName = firstName.charAt(0).toUpperCase() + firstName.slice(1);
-  const renderedStats = formatStats(stats);
+  const renderedStats = formatStats(stats ?? null);
 
   return (
     <AppLayout>

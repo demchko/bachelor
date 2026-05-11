@@ -1,14 +1,9 @@
 'use client';
 
-import {
-  createContext,
-  useCallback,
-  useContext,
-  useEffect,
-  useRef,
-  useState,
-} from 'react';
+import { createContext, useContext, useEffect, useRef } from 'react';
+import { useMutation } from '@tanstack/react-query';
 import { api, User } from './api';
+import { useAuthStore } from './store/auth';
 
 const REFRESH_TOKEN_KEY = 'refreshToken';
 
@@ -26,80 +21,71 @@ interface AuthContextValue {
 const AuthContext = createContext<AuthContextValue | null>(null);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
-  const [accessToken, setAccessToken] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const { user, accessToken, isLoading, setAuth, setLoading, clearAuth } =
+    useAuthStore();
 
-  // Keep a ref so callbacks always see the latest token without re-creating
+  // Keep a ref so mutation callbacks always see the latest token
   const tokenRef = useRef<string | null>(null);
   tokenRef.current = accessToken;
-
-  const applyTokens = useCallback(
-    (tokens: { accessToken: string; refreshToken: string }) => {
-      localStorage.setItem(REFRESH_TOKEN_KEY, tokens.refreshToken);
-      setAccessToken(tokens.accessToken);
-      tokenRef.current = tokens.accessToken;
-    },
-    [],
-  );
-
-  const clearAuth = useCallback(() => {
-    localStorage.removeItem(REFRESH_TOKEN_KEY);
-    setAccessToken(null);
-    setUser(null);
-    tokenRef.current = null;
-  }, []);
 
   // Restore session on mount
   useEffect(() => {
     const stored = localStorage.getItem(REFRESH_TOKEN_KEY);
     if (!stored) {
-      setIsLoading(false);
+      setLoading(false);
       return;
     }
     api
       .refresh(stored)
       .then(async (tokens) => {
-        applyTokens(tokens);
+        localStorage.setItem(REFRESH_TOKEN_KEY, tokens.refreshToken);
         const me = await api.me(tokens.accessToken);
-        setUser(me);
+        setAuth(me, tokens.accessToken);
       })
       .catch(() => localStorage.removeItem(REFRESH_TOKEN_KEY))
-      .finally(() => setIsLoading(false));
-  }, [applyTokens]);
+      .finally(() => setLoading(false));
+  }, [setAuth, setLoading]);
 
-  const login = useCallback(
-    async (email: string, password: string) => {
+  const loginMutation = useMutation({
+    mutationFn: async ({
+      email,
+      password,
+    }: {
+      email: string;
+      password: string;
+    }) => {
       const tokens = await api.login(email, password);
-      applyTokens(tokens);
+      localStorage.setItem(REFRESH_TOKEN_KEY, tokens.refreshToken);
       const me = await api.me(tokens.accessToken);
-      setUser(me);
+      return { me, tokens };
     },
-    [applyTokens],
-  );
+    onSuccess: ({ me, tokens }) => setAuth(me, tokens.accessToken),
+  });
 
-  const logout = useCallback(async () => {
-    const token = tokenRef.current;
-    clearAuth();
-    if (token) {
-      await api.logout(token).catch(() => {});
-    }
-  }, [clearAuth]);
+  const logoutMutation = useMutation({
+    mutationFn: async () => {
+      const token = tokenRef.current;
+      localStorage.removeItem(REFRESH_TOKEN_KEY);
+      clearAuth();
+      tokenRef.current = null;
+      if (token) await api.logout(token).catch(() => {});
+    },
+  });
 
-  const register = useCallback(
-    (email: string, password: string) => api.register(email, password),
-    [],
-  );
+  const registerMutation = useMutation({
+    mutationFn: ({ email, password }: { email: string; password: string }) =>
+      api.register(email, password),
+  });
 
-  const verifyEmail = useCallback(
-    (email: string, token: string) => api.verifyEmail(email, token),
-    [],
-  );
+  const verifyEmailMutation = useMutation({
+    mutationFn: ({ email, token }: { email: string; token: string }) =>
+      api.verifyEmail(email, token),
+  });
 
-  const resendVerification = useCallback(
-    (email: string) => api.resendVerification(email),
-    [],
-  );
+  const resendVerificationMutation = useMutation({
+    mutationFn: ({ email }: { email: string }) =>
+      api.resendVerification(email),
+  });
 
   return (
     <AuthContext.Provider
@@ -107,11 +93,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         user,
         accessToken,
         isLoading,
-        login,
-        logout,
-        register,
-        verifyEmail,
-        resendVerification,
+        login: (email, password) =>
+          loginMutation.mutateAsync({ email, password }).then(() => {}),
+        logout: () => logoutMutation.mutateAsync(),
+        register: (email, password) =>
+          registerMutation.mutateAsync({ email, password }),
+        verifyEmail: (email, token) =>
+          verifyEmailMutation.mutateAsync({ email, token }),
+        resendVerification: (email) =>
+          resendVerificationMutation.mutateAsync({ email }),
       }}
     >
       {children}

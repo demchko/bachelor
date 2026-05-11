@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
 import AppLayout from '@/app/components/AppLayout';
 import {
@@ -150,16 +151,12 @@ function parseManual(input: string): number[] | { error: string } {
 
 export default function GeneratorPage() {
   const { accessToken } = useAuth();
+  const queryClient = useQueryClient();
   const [state, dispatch] = useReducer(reducer, INITIAL);
 
   const [rightTab, setRightTab] = useState<RightTab>('coverage');
   const [hoveredSum, setHoveredSum] = useState<{ start: number; length: number } | null>(null);
 
-  /**
-   * Local raw text state for n/r number inputs so the user can freely clear
-   * the field, type a new value, etc. without state jumping mid-typing.
-   * Synced to numeric `state.n / state.r` only when the value is a valid integer.
-   */
   const [nDraft, setNDraft] = useState<string>(String(INITIAL.n));
   const [rDraft, setRDraft] = useState<string>(String(INITIAL.r));
 
@@ -170,147 +167,80 @@ export default function GeneratorPage() {
     setRDraft(String(state.r));
   }, [state.r]);
 
-  const [properties, setProperties] = useState<IrbProperties | null>(null);
-  const [propertiesLoading, setPropertiesLoading] = useState(false);
+  /* ─── Queries ──────────────────────────────────────────────── */
 
-  const [variants, setVariants] = useState<IrbResult[]>([]);
-  const [variantsLoading, setVariantsLoading] = useState(false);
+  const propertiesQuery = useQuery({
+    queryKey: ['irb-properties', state.result?.sequence, state.result?.r],
+    queryFn: () => irbApi.properties(accessToken!, state.result!.sequence, state.result!.r),
+    enabled: !!accessToken && !!state.result,
+  });
 
-  const [presets, setPresets] = useState<IrbPreset[]>([]);
-  const [presetsLoading, setPresetsLoading] = useState(false);
+  const presetsQuery = useQuery({
+    queryKey: ['irb-presets'],
+    queryFn: () => irbApi.presets(accessToken!),
+    enabled: !!accessToken && rightTab === 'presets',
+    staleTime: 5 * 60_000,
+  });
 
-  const [saved, setSaved] = useState<IrbConfigItem[]>([]);
-  const [savedLoading, setSavedLoading] = useState(false);
+  const savedQuery = useQuery({
+    queryKey: ['irb-saved'],
+    queryFn: () => irbApi.list(accessToken!),
+    enabled: !!accessToken && rightTab === 'saved',
+    staleTime: 0,
+  });
 
-  const requestSeq = useRef(0);
+  const variantsQuery = useQuery({
+    queryKey: ['irb-variants', state.n, state.r],
+    queryFn: () => irbApi.variants(accessToken!, state.n, state.r, 5),
+    enabled: !!accessToken && rightTab === 'variants',
+  });
+
+  const refreshVariants = useCallback(() => {
+    queryClient.invalidateQueries({ queryKey: ['irb-variants', state.n, state.r] });
+  }, [queryClient, state.n, state.r]);
 
   /* ─── Initial generate after mount ─────────────────────────── */
+  const didInitialGenerate = useRef(false);
+
   useEffect(() => {
-    if (!accessToken) return;
-    const seq = ++requestSeq.current;
+    if (!accessToken || didInitialGenerate.current) return;
+    didInitialGenerate.current = true;
     dispatch({ type: 'SET_LOADING', loading: true });
     irbApi
       .generate(accessToken, INITIAL.n, INITIAL.r)
-      .then((data) => {
-        if (requestSeq.current !== seq) return;
-        dispatch({ type: 'SET_RESULT', result: data });
-      })
-      .catch((err: Error) => {
-        if (requestSeq.current !== seq) return;
-        dispatch({ type: 'SET_ERROR', error: humanize(err.message) });
-      })
-      .finally(() => {
-        if (requestSeq.current !== seq) return;
-        dispatch({ type: 'SET_LOADING', loading: false });
-      });
+      .then((data) => dispatch({ type: 'SET_RESULT', result: data }))
+      .catch((err: Error) => dispatch({ type: 'SET_ERROR', error: humanize(err.message) }))
+      .finally(() => dispatch({ type: 'SET_LOADING', loading: false }));
   }, [accessToken]);
 
-  /* ─── Properties refresh whenever result changes ──────────── */
-  useEffect(() => {
-    if (!accessToken || !state.result) return;
-    const seq = ++requestSeq.current;
-    setPropertiesLoading(true);
-    irbApi
-      .properties(accessToken, state.result.sequence, state.result.r)
-      .then((data) => {
-        if (requestSeq.current !== seq) return;
-        setProperties(data);
-      })
-      .catch(() => {
-        if (requestSeq.current !== seq) return;
-        setProperties(null);
-      })
-      .finally(() => {
-        if (requestSeq.current !== seq) return;
-        setPropertiesLoading(false);
-      });
-  }, [accessToken, state.result]);
-
-  /* ─── Lazy load presets/saved when tab opens ──────────────── */
-  useEffect(() => {
-    if (!accessToken) return;
-    if (rightTab === 'presets' && presets.length === 0 && !presetsLoading) {
-      setPresetsLoading(true);
-      irbApi
-        .presets(accessToken)
-        .then(setPresets)
-        .catch(() => setPresets([]))
-        .finally(() => setPresetsLoading(false));
-    }
-    if (rightTab === 'saved') {
-      setSavedLoading(true);
-      irbApi
-        .list(accessToken)
-        .then(setSaved)
-        .catch(() => setSaved([]))
-        .finally(() => setSavedLoading(false));
-    }
-  }, [accessToken, rightTab, presets.length, presetsLoading]);
-
-  /* ─── Lazy load variants when tab opens ───────────────────── */
-  const refreshVariants = useCallback(async () => {
-    if (!accessToken) return;
-    setVariantsLoading(true);
-    try {
-      const data = await irbApi.variants(accessToken, state.n, state.r, 5);
-      setVariants(data);
-    } catch {
-      setVariants([]);
-    } finally {
-      setVariantsLoading(false);
-    }
-  }, [accessToken, state.n, state.r]);
-
-  useEffect(() => {
-    if (rightTab === 'variants' && accessToken) {
-      refreshVariants();
-    }
-  }, [rightTab, accessToken, refreshVariants]);
-
   /* ─── Generate / Validate handler ─────────────────────────── */
-  const compute = useCallback(async () => {
-    if (!accessToken) return;
+  const computeMutation = useMutation({
+    mutationFn: async () => {
+      if (state.manualMode) {
+        const parsed = parseManual(state.manualInput);
+        if (!Array.isArray(parsed)) throw new Error(parsed.error);
+        return irbApi.validate(accessToken!, parsed, state.r);
+      }
+      return irbApi.generate(accessToken!, state.n, state.r);
+    },
+    onMutate: () => dispatch({ type: 'SET_LOADING', loading: true }),
+    onSuccess: (data) => dispatch({ type: 'SET_RESULT', result: data }),
+    onError: (err: Error) => dispatch({ type: 'SET_ERROR', error: humanize(err.message) }),
+    onSettled: () => dispatch({ type: 'SET_LOADING', loading: false }),
+  });
 
+  const compute = useCallback(() => {
+    if (!accessToken) return;
     if (!isValidR(state.r)) {
-      dispatch({
-        type: 'SET_ERROR',
-        error: `R має бути цілим числом від ${R_MIN} до ${R_MAX}.`,
-      });
+      dispatch({ type: 'SET_ERROR', error: `R має бути цілим числом від ${R_MIN} до ${R_MAX}.` });
       return;
     }
     if (!state.manualMode && !isValidN(state.n)) {
-      dispatch({
-        type: 'SET_ERROR',
-        error: `N має бути цілим числом від ${N_MIN} до ${N_MAX}.`,
-      });
+      dispatch({ type: 'SET_ERROR', error: `N має бути цілим числом від ${N_MIN} до ${N_MAX}.` });
       return;
     }
-
-    const seq = ++requestSeq.current;
-    dispatch({ type: 'SET_LOADING', loading: true });
-    try {
-      let data: IrbResult;
-      if (state.manualMode) {
-        const parsed = parseManual(state.manualInput);
-        if (!Array.isArray(parsed)) {
-          dispatch({ type: 'SET_ERROR', error: parsed.error });
-          dispatch({ type: 'SET_LOADING', loading: false });
-          return;
-        }
-        data = await irbApi.validate(accessToken, parsed, state.r);
-      } else {
-        data = await irbApi.generate(accessToken, state.n, state.r);
-      }
-      if (requestSeq.current !== seq) return;
-      dispatch({ type: 'SET_RESULT', result: data });
-    } catch (err) {
-      if (requestSeq.current !== seq) return;
-      dispatch({ type: 'SET_ERROR', error: humanize((err as Error).message) });
-    } finally {
-      if (requestSeq.current !== seq) return;
-      dispatch({ type: 'SET_LOADING', loading: false });
-    }
-  }, [accessToken, state.manualMode, state.manualInput, state.n, state.r]);
+    computeMutation.mutate();
+  }, [accessToken, state.r, state.manualMode, state.n, computeMutation]);
 
   /* ─── Edit a single ring node directly ────────────────────── */
   const handleNodeChange = useCallback(
@@ -332,39 +262,43 @@ export default function GeneratorPage() {
   );
 
   /* ─── Save current configuration ──────────────────────────── */
-  const handleSave = useCallback(async () => {
-    if (!accessToken || !state.result) return;
-    try {
-      const data = await irbApi.validate(
-        accessToken,
-        state.result.sequence,
-        state.result.r,
+  const saveMutation = useMutation({
+    mutationFn: () =>
+      irbApi.validate(
+        accessToken!,
+        state.result!.sequence,
+        state.result!.r,
         true,
-        `IRB(n=${state.result.n}, R=${state.result.r})`,
-      );
+        `IRB(n=${state.result!.n}, R=${state.result!.r})`,
+      ),
+    onSuccess: (data) => {
       dispatch({ type: 'SET_RESULT', result: data });
-      setSavedLoading(true);
-      const list = await irbApi.list(accessToken);
-      setSaved(list);
+      queryClient.invalidateQueries({ queryKey: ['irb-saved'] });
       setRightTab('saved');
-    } catch (err) {
-      dispatch({ type: 'SET_ERROR', error: humanize((err as Error).message) });
-    } finally {
-      setSavedLoading(false);
-    }
-  }, [accessToken, state.result]);
+    },
+    onError: (err: Error) => dispatch({ type: 'SET_ERROR', error: humanize(err.message) }),
+  });
+
+  const handleSave = useCallback(() => {
+    if (!accessToken || !state.result) return;
+    saveMutation.mutate();
+  }, [accessToken, state.result, saveMutation]);
+
+  const removeMutation = useMutation({
+    mutationFn: (id: string) => irbApi.remove(accessToken!, id),
+    onSuccess: (_data, id) => {
+      queryClient.setQueryData<IrbConfigItem[]>(['irb-saved'], (old) =>
+        old?.filter((it) => it.id !== id) ?? [],
+      );
+    },
+  });
 
   const handleRemoveSaved = useCallback(
-    async (id: string) => {
+    (id: string) => {
       if (!accessToken) return;
-      try {
-        await irbApi.remove(accessToken, id);
-        setSaved((items) => items.filter((it) => it.id !== id));
-      } catch {
-        // ignore
-      }
+      removeMutation.mutate(id);
     },
-    [accessToken],
+    [accessToken, removeMutation],
   );
 
   /* ─── Derived values ──────────────────────────────────────── */
@@ -718,16 +652,16 @@ export default function GeneratorPage() {
 
             {rightTab === 'properties' && (
               <PropertiesPanel
-                props={properties}
-                loading={propertiesLoading}
-                onApplySequence={(seq) => applySequence(seq, properties?.r)}
+                props={propertiesQuery.data ?? null}
+                loading={propertiesQuery.isPending}
+                onApplySequence={(seq) => applySequence(seq, propertiesQuery.data?.r)}
               />
             )}
 
             {rightTab === 'variants' && (
               <VariantsPanel
-                variants={variants}
-                loading={variantsLoading}
+                variants={variantsQuery.data ?? []}
+                loading={variantsQuery.isPending}
                 onLoad={(v) => applySequence(v.sequence, v.r)}
                 onRefresh={refreshVariants}
               />
@@ -735,16 +669,16 @@ export default function GeneratorPage() {
 
             {rightTab === 'presets' && (
               <PresetsPanel
-                presets={presets}
-                loading={presetsLoading}
+                presets={presetsQuery.data ?? []}
+                loading={presetsQuery.isPending}
                 onLoad={(p) => applySequence(p.sequence, p.r)}
               />
             )}
 
             {rightTab === 'saved' && (
               <SavedPanel
-                items={saved}
-                loading={savedLoading}
+                items={savedQuery.data ?? []}
+                loading={savedQuery.isPending}
                 onLoad={(item) => applySequence(item.sequence, item.r)}
                 onRemove={handleRemoveSaved}
               />

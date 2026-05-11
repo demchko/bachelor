@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
+import { useQuery, useMutation } from '@tanstack/react-query';
 import AppLayout from '@/app/components/AppLayout';
 import { testsApi, type TestQuestion, type TestSubmissionResult } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
@@ -9,42 +10,45 @@ type AnswerMap = Record<number, number>;
 
 export default function TestsPage() {
   const { accessToken } = useAuth();
-  const [questions, setQuestions] = useState<TestQuestion[]>([]);
   const [answers, setAnswers] = useState<AnswerMap>({});
   const [submission, setSubmission] = useState<TestSubmissionResult | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
   const [startedAt, setStartedAt] = useState<number | null>(null);
 
-  useEffect(() => {
-    if (!accessToken) return;
-    testsApi
-      .bank(accessToken)
-      .then((data) => {
-        setQuestions(data.questions);
-        setStartedAt(Date.now());
-      })
-      .catch((err: Error) => setError(err.message));
-  }, [accessToken]);
+  const bankQuery = useQuery({
+    queryKey: ['tests-bank'],
+    queryFn: () => testsApi.bank(accessToken!),
+    enabled: !!accessToken,
+    staleTime: Infinity,
+  });
 
-  const handleSubmit = useCallback(async () => {
-    if (!accessToken || questions.length === 0) return;
-    if (Object.keys(answers).length < questions.length) return;
-    setLoading(true);
-    try {
+  const questions = bankQuery.data?.questions ?? [];
+
+  useEffect(() => {
+    if (bankQuery.data && startedAt === null) {
+      setStartedAt(Date.now());
+    }
+  }, [bankQuery.data, startedAt]);
+
+  const submitMutation = useMutation({
+    mutationFn: () => {
       const payload = questions.map((q) => ({
         questionId: q.id,
         optionIndex: answers[q.id],
       }));
       const durationSec = startedAt ? Math.round((Date.now() - startedAt) / 1000) : undefined;
-      const result = await testsApi.submit(accessToken, payload, durationSec);
-      setSubmission(result);
-    } catch (err) {
-      setError((err as Error).message);
-    } finally {
-      setLoading(false);
-    }
-  }, [accessToken, answers, questions, startedAt]);
+      return testsApi.submit(accessToken!, payload, durationSec);
+    },
+    onSuccess: setSubmission,
+  });
+
+  const loading = submitMutation.isPending;
+  const error = bankQuery.error?.message ?? submitMutation.error?.message ?? null;
+
+  const handleSubmit = () => {
+    if (!accessToken || questions.length === 0) return;
+    if (Object.keys(answers).length < questions.length) return;
+    submitMutation.mutate();
+  };
 
   const handleReset = () => {
     setAnswers({});
