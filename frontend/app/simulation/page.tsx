@@ -15,6 +15,16 @@ import {
 import { useAuth } from '@/lib/auth-context';
 import Link from 'next/link';
 import { buildClientSimulationChart } from '@/lib/simulation/sweep-chart-client';
+import {
+  CartesianGrid,
+  Legend,
+  Line,
+  LineChart,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from 'recharts';
 
 const SEQUENCE_PRESETS: { label: string; seq: number[] }[] = [
   { label: '1,3,2,7 (n=4)', seq: [1, 3, 2, 7] },
@@ -97,14 +107,10 @@ function SweepChart({
   compareRS: boolean;
   primaryLabel: string;
 }) {
-  const maxVal = 100;
-  const h = 200;
-  const w = 680;
-  const pad = { top: 28, right: 12, bottom: 36, left: 40 };
-  const innerW = w - pad.left - pad.right;
-  const innerH = h - pad.top - pad.bottom;
-  const xs = data.map((_, i) => pad.left + (i / Math.max(data.length - 1, 1)) * innerW);
-  const toY = (v: number) => pad.top + innerH - (Math.min(100, Math.max(0, v)) / maxVal) * innerH;
+  const chartData = data.map((point) => ({
+    ...point,
+    errorLabel: formatSweepAxisP(point.errorRate),
+  }));
 
   const lines: { key: keyof SimulationChartPoint; color: string; label: string }[] = [
     { key: 'irb', color: '#ea580c', label: primaryLabel },
@@ -113,50 +119,57 @@ function SweepChart({
   ];
 
   return (
-    <svg viewBox={`0 0 ${w} ${h}`} className="w-full max-w-3xl mx-auto" role="img" aria-label="Графік успішності">
-      <rect x="0" y="0" width={w} height={h} fill="#f8fafc" rx="8" />
-      {[0, 25, 50, 75, 100].map((v) => (
-        <g key={v}>
-          <line
-            x1={pad.left}
-            y1={toY(v)}
-            x2={w - pad.right}
-            y2={toY(v)}
-            stroke="#e2e8f0"
-            strokeWidth="1"
+    <div className="h-64 w-full rounded-lg bg-slate-50 px-2 py-3" role="img" aria-label="Графік успішності">
+      <ResponsiveContainer width="100%" height="100%">
+        <LineChart data={chartData} margin={{ top: 8, right: 20, bottom: 4, left: 0 }}>
+          <CartesianGrid stroke="#e2e8f0" strokeDasharray="4 4" vertical={false} />
+          <XAxis
+            dataKey="errorLabel"
+            interval={0}
+            minTickGap={4}
+            tick={{ fontSize: 10, fill: '#475569', fontWeight: 500 }}
+            tickLine={false}
+            axisLine={{ stroke: '#cbd5e1' }}
           />
-          <text x={pad.left - 6} y={toY(v)} textAnchor="end" dominantBaseline="middle" fontSize="10" fill="#64748b">
-            {v}%
-          </text>
-        </g>
-      ))}
-      {lines.map(({ key, color }) => {
-        const pts = data.map((d, i) => `${xs[i]},${toY(Number(d[key] ?? 0))}`).join(' ');
-        return (
-          <g key={key}>
-            <polyline points={pts} fill="none" stroke={color} strokeWidth="2.5" strokeLinejoin="round" />
-            {data.map((d, i) => (
-              <circle key={i} cx={xs[i]} cy={toY(Number(d[key] ?? 0))} r="3.5" fill={color} stroke="#fff" strokeWidth="1" />
-            ))}
-          </g>
-        );
-      })}
-      {data.map((d, i) => (
-        <text key={i} x={xs[i]} y={h - 10} textAnchor="middle" fontSize="9" fill="#475569" fontWeight="500">
-          {formatSweepAxisP(d.errorRate)}
-        </text>
-      ))}
-      <g transform={`translate(${pad.left}, 8)`}>
-        {lines.map(({ color, label }, i) => (
-          <g key={label} transform={`translate(${i * 132}, 0)`}>
-            <line x1="0" y1="6" x2="16" y2="6" stroke={color} strokeWidth="3" />
-            <text x="22" y="10" fontSize="10" fill="#334155" fontWeight="500">
-              {label}
-            </text>
-          </g>
-        ))}
-      </g>
-    </svg>
+          <YAxis
+            domain={[0, 100]}
+            width={42}
+            tickFormatter={(value) => `${value}%`}
+            tick={{ fontSize: 10, fill: '#64748b' }}
+            tickLine={false}
+            axisLine={false}
+          />
+          <Tooltip
+            formatter={(value, name) => [
+              `${Number(value).toFixed(1)}%`,
+              String(name),
+            ]}
+            labelFormatter={(label) => `Ймовірність помилки: ${label}`}
+            contentStyle={{
+              borderRadius: 10,
+              border: '1px solid #cbd5e1',
+              boxShadow: '0 12px 28px rgba(15, 23, 42, 0.12)',
+              fontSize: 12,
+            }}
+          />
+          <Legend wrapperStyle={{ fontSize: 11, paddingTop: 6 }} />
+          {lines.map(({ key, color, label }) => (
+            <Line
+              key={key}
+              type="monotone"
+              dataKey={key}
+              name={label}
+              stroke={color}
+              strokeWidth={2.5}
+              dot={{ r: 3, strokeWidth: 1, fill: color, stroke: '#fff' }}
+              activeDot={{ r: 5, stroke: '#fff', strokeWidth: 2 }}
+              connectNulls
+              isAnimationActive={false}
+            />
+          ))}
+        </LineChart>
+      </ResponsiveContainer>
+    </div>
   );
 }
 
@@ -258,10 +271,6 @@ export default function SimulationPage() {
   const [historySavedAck, setHistorySavedAck] = useState(false);
 
   const sequence = useMemo(() => parseSequence(sequenceText), [sequenceText]);
-
-  useEffect(() => {
-    if (codeKind === 'binary') setCompareBinary(false);
-  }, [codeKind]);
 
   useEffect(() => {
     if (!historySavedAck) return;
@@ -392,7 +401,10 @@ export default function SimulationPage() {
                     <button
                       key={opt.kind}
                       type="button"
-                      onClick={() => setCodeKind(opt.kind)}
+                      onClick={() => {
+                        setCodeKind(opt.kind);
+                        if (opt.kind === 'binary') setCompareBinary(false);
+                      }}
                       className={`rounded-xl border-2 px-3 py-3 text-left text-sm transition min-h-[5.75rem] flex flex-col ${
                         codeKind === opt.kind
                           ? 'border-cyan-600 bg-cyan-50 shadow-sm ring-1 ring-cyan-600/20'
