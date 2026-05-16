@@ -243,7 +243,39 @@ export interface EfficiencyResult {
   correctablePct: number;
 }
 
+export interface CyclicStructureResult {
+  blockLength: number;
+  informationLength: number;
+  redundancy: number;
+  differenceSet: number[];
+  generatorMatrix: number[][];
+  parityCheckMatrix: number[][];
+  informationColumns: number[];
+}
+
+export interface MonolithicMetaResult {
+  blockLength: number;
+  symbolWidth: number;
+  codewords: string[];
+  capacitySymbols: number;
+}
+
+export interface TrapezoidRow {
+  n: number;
+  coefficients: number[];
+  sum: number;
+  xn: number;
+}
+
+export interface TrapezoidResponse {
+  rows: TrapezoidRow[];
+}
+
 export const codesApi = {
+  trapezoid: (token: string, maxN?: number) =>
+    request<TrapezoidResponse>('/codes/trapezoid' + (maxN != null ? `?maxN=${maxN}` : ''), {
+      headers: authHeaders(token),
+    }),
   cyclicEncode: (token: string, sequence: number[], data: string) =>
     request<EncodeResult>('/codes/cyclic/encode', {
       method: 'POST',
@@ -292,6 +324,7 @@ export interface SimulationStats {
   successRate: number;
 }
 
+/** `errorRate` — p каналу у відсотках (може бути дробовим, напр. 0.2 для p = 0.002). */
 export interface SimulationChartPoint {
   errorRate: number;
   irb: number;
@@ -305,6 +338,21 @@ export interface SimulationResult {
   chart: SimulationChartPoint[];
   delta: number;
   savedRunId?: string;
+}
+
+export interface SimulationRunSummary {
+  id: string;
+  codeKind: CodeKind;
+  irbSequence: number[];
+  packets: number;
+  errorProbability: number;
+  totalBits: number;
+  bitErrors: number;
+  successfulPackets: number;
+  recoveredPackets: number;
+  bitFlipRate: number;
+  successRate: number;
+  createdAt: string;
 }
 
 export const simulationApi = {
@@ -324,6 +372,10 @@ export const simulationApi = {
       method: 'POST',
       headers: authHeaders(token),
       body: JSON.stringify(payload),
+    }),
+  listRuns: (token: string) =>
+    request<SimulationRunSummary[]>('/simulation/runs', {
+      headers: authHeaders(token),
     }),
 };
 

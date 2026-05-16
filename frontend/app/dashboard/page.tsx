@@ -20,6 +20,28 @@ const quickLinks = [
     color: 'bg-orange-500',
   },
   {
+    href: '/vector-codes',
+    title: 'Векторні коди',
+    description: 'Монолітні пакети 1^w0^{n−w}, трапеційна таблиця, декодування',
+    icon: (
+      <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 20l4-16m2 16l4-16M6 9h14M4 15h14" />
+      </svg>
+    ),
+    color: 'bg-amber-600',
+  },
+  {
+    href: '/cyclic-codes',
+    title: 'Циклічні коди',
+    description: 'Множина D на кільці Z_S, матриці G та H, синдромне декодування',
+    icon: (
+      <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+      </svg>
+    ),
+    color: 'bg-indigo-600',
+  },
+  {
     href: '/simulation',
     title: 'Симуляція',
     description: 'Симулюйте передачу даних по зашумленому каналу',
@@ -52,6 +74,17 @@ const quickLinks = [
       </svg>
     ),
     color: 'bg-violet-500',
+  },
+  {
+    href: '/profile',
+    title: 'Профіль',
+    description: 'Статистика, активність і всі розділи з одного місця',
+    icon: (
+      <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+      </svg>
+    ),
+    color: 'bg-slate-700',
   },
 ];
 
@@ -93,7 +126,7 @@ export default function DashboardPage() {
     <AppLayout>
       <header className="bg-white border-b border-gray-200 px-8 py-5">
         <div>
-          <h1 className="text-xl font-bold text-gray-900">Dashboard</h1>
+          <h1 className="text-xl font-bold text-gray-900">Головна панель</h1>
           <p className="text-sm text-gray-500 mt-0.5">
             Вітаємо, {displayName}! Оберіть розділ для роботи.
           </p>
@@ -118,7 +151,7 @@ export default function DashboardPage() {
         <h2 className="text-xs font-semibold uppercase tracking-widest text-gray-400 mb-4">
           Швидкий доступ
         </h2>
-        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {quickLinks.map((item) => (
             <Link
               key={item.href}
@@ -134,6 +167,80 @@ export default function DashboardPage() {
               <p className="text-sm text-gray-500 leading-relaxed">{item.description}</p>
             </Link>
           ))}
+        </div>
+
+        <div className="mt-10 grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div className="lg:col-span-2 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+            <h2 className="text-xs font-semibold uppercase tracking-widest text-slate-400 mb-3">Рекомендований маршрут</h2>
+            <ol className="space-y-3 text-sm text-slate-700">
+              <li className="flex gap-3">
+                <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-orange-100 text-xs font-bold text-orange-800">
+                  1
+                </span>
+                <span>
+                  <Link className="font-semibold text-orange-700 hover:underline" href="/generator">
+                    Генератор
+                  </Link>{' '}
+                  — підготуйте або імпортуйте валідну ІКВ-послідовність.
+                </span>
+              </li>
+              <li className="flex gap-3">
+                <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-orange-100 text-xs font-bold text-orange-800">
+                  2
+                </span>
+                <span>
+                  <Link className="font-semibold text-orange-700 hover:underline" href="/cyclic-codes">
+                    Циклічний
+                  </Link>{' '}
+                  або{' '}
+                  <Link className="font-semibold text-orange-700 hover:underline" href="/vector-codes">
+                    монолітний
+                  </Link>{' '}
+                  код — закріпіть структуру матриць і декодування.
+                </span>
+              </li>
+              <li className="flex gap-3">
+                <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-orange-100 text-xs font-bold text-orange-800">
+                  3
+                </span>
+                <span>
+                  <Link className="font-semibold text-orange-700 hover:underline" href="/simulation">
+                    Симуляція
+                  </Link>{' '}
+                  — порівняйте ІКВ з бінарним каналом і довідковою кривою RS.
+                </span>
+              </li>
+              <li className="flex gap-3">
+                <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-orange-100 text-xs font-bold text-orange-800">
+                  4
+                </span>
+                <span>
+                  <Link className="font-semibold text-orange-700 hover:underline" href="/theory">
+                    Теорія
+                  </Link>{' '}
+                  та{' '}
+                  <Link className="font-semibold text-orange-700 hover:underline" href="/tests">
+                    тести
+                  </Link>{' '}
+                  — підсумок курсу.
+                </span>
+              </li>
+            </ol>
+          </div>
+          <div className="rounded-2xl border border-slate-200 bg-gradient-to-br from-slate-900 to-slate-800 p-6 text-white shadow-sm flex flex-col justify-between">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-widest text-slate-400">Профіль</p>
+              <p className="mt-2 text-sm text-slate-300 leading-relaxed">
+                Перегляньте статистику тестів, симуляцій і збережених конфігурацій — усі розділи також зібрані там.
+              </p>
+            </div>
+            <Link
+              href="/profile"
+              className="mt-4 inline-flex justify-center rounded-xl bg-orange-500 px-4 py-2.5 text-sm font-semibold text-white hover:bg-orange-600"
+            >
+              Відкрити профіль
+            </Link>
+          </div>
         </div>
 
         {/* Info banner */}

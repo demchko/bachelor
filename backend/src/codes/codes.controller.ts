@@ -4,11 +4,22 @@ import { CodesService } from './codes.service';
 import { DecodeDto } from './dto/decode.dto';
 import { EfficiencyDto } from './dto/efficiency.dto';
 import { EncodeDto } from './dto/encode.dto';
+import { SequenceDto } from './dto/sequence.dto';
 
 @UseGuards(JwtAccessGuard)
 @Controller('codes')
 export class CodesController {
   constructor(private readonly codesService: CodesService) {}
+
+  @Post('cyclic/structure')
+  cyclicStructure(@Body() dto: SequenceDto) {
+    return this.codesService.cyclicStructure(dto.sequence);
+  }
+
+  @Post('monolithic/meta')
+  monolithicMeta(@Body() dto: SequenceDto) {
+    return this.codesService.monolithicMeta(dto.sequence.length);
+  }
 
   /* Cyclic */
 

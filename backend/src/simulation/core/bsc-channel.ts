@@ -150,22 +150,24 @@ function runBinary(blockLen: number, packets: number, p: number): SimulationStat
 }
 
 /**
- * Reed-Solomon (255, 223) over GF(2^8) — analytical estimate.
- * Implementing GF(256) RS in full is out of scope for this scaffold;
- * we use a Gilbert-Varshamov style upper bound on packet success rate:
- *   P_success ≈ Σ_{i=0..t} C(n_b, i) p^i (1-p)^{n_b - i}
- * where n_b = 255 bytes ≈ 2040 bits and t = 16 byte-errors corrected.
+ * Reed-Solomon (255, 191) over GF(2^8) — analytical block-success estimate.
+ * RS(255,191) has d_min = 65, so t = ⌊(d−1)/2⌋ = 32 correctable byte symbols per codeword
+ * (stronger than the common RS(255,223) demo with t = 16), which keeps the comparison curve
+ * meaningful on the same BSC + i.i.d. bit → byte-error model used before.
+ *
+ *   P_success ≈ Σ_{i=0..t} C(n_b, i) p_byte^i (1−p_byte)^{n_b−i},  p_byte = 1−(1−p)^8.
  */
 function runReedSolomonAnalytic(packets: number, p: number): SimulationStats {
   const blockLen = 255 * 8;
-  const t = 16; // RS(255, 223) corrects up to 16 byte errors per block
+  const t = 32; // RS(255, 191): 32 byte-symbol errors per 255-byte block
   // Approximate byte-error probability via 1 - (1-p)^8.
   const pByte = 1 - Math.pow(1 - p, 8);
-  // Probability of ≤ t byte errors (sum of binomial PMF).
-  let pSuccess = 0;
+  // P(≤ t byte errors) — log-sum-exp for numerical stability on the left tail.
+  const logPmfs: number[] = [];
   for (let i = 0; i <= t; i += 1) {
-    pSuccess += binomialPmf(255, i, pByte);
+    logPmfs.push(binomialLogPmf(255, i, pByte));
   }
+  const pSuccess = Math.exp(logSumExp(logPmfs));
   const successfulPackets = Math.round(packets * pSuccess);
   const totalBits = packets * blockLen;
   const bitErrors = Math.round(totalBits * p);
@@ -182,15 +184,28 @@ function runReedSolomonAnalytic(packets: number, p: number): SimulationStats {
   };
 }
 
-function binomialPmf(n: number, k: number, p: number): number {
-  if (k < 0 || k > n) return 0;
-  if (p === 0) return k === 0 ? 1 : 0;
-  if (p === 1) return k === n ? 1 : 0;
+/** log( C(n,k) p^k (1-p)^(n-k) ), natural log. */
+function binomialLogPmf(n: number, k: number, p: number): number {
+  if (k < 0 || k > n) return -Infinity;
+  if (p <= 0) return k === 0 ? 0 : -Infinity;
+  if (p >= 1) return k === n ? 0 : -Infinity;
   let logC = 0;
   for (let i = 1; i <= k; i += 1) {
     logC += Math.log(n - i + 1) - Math.log(i);
   }
-  return Math.exp(logC + k * Math.log(p) + (n - k) * Math.log(1 - p));
+  return logC + k * Math.log(p) + (n - k) * Math.log(1 - p);
+}
+
+/** log( Σ exp(x_i) ). */
+function logSumExp(xs: number[]): number {
+  const m = Math.max(...xs);
+  if (!Number.isFinite(m) || m === -Infinity) return -Infinity;
+  let s = 0;
+  for (const x of xs) {
+    if (Number.isFinite(x)) s += Math.exp(x - m);
+  }
+  if (s <= 0) return -Infinity;
+  return m + Math.log(s);
 }
 
 /* ─── Public API ──────────────────────────────────────────── */
@@ -230,12 +245,15 @@ export function buildSweepChart(
   compareBinary: boolean,
   compareReedSolomon: boolean,
 ): { errorRate: number; irb: number; binary?: number; reedSolomon?: number }[] {
-  const errorRates = [0.02, 0.05, 0.1, 0.15, 0.2, 0.25, 0.3];
+  // Include low p: RS block success still collapses at moderate p under the byte-error model,
+  // so curves would look "flat zero" if the sweep started only at 2%.
+  const rawP = [0.002, 0.004, 0.006, 0.008, 0.01, 0.015, 0.02, 0.03, 0.05, 0.08, 0.12, 0.18, 0.25, 0.3];
   const samples = 500;
-  return errorRates.map((er) => {
+  return rawP.map((er) => {
     const irb = simulate(primary, sequence, samples, er).successRate * 100;
+    // Percent for axis labels (may be fractional, e.g. 0.2 for p=0.002).
     const point: { errorRate: number; irb: number; binary?: number; reedSolomon?: number } = {
-      errorRate: Math.round(er * 100),
+      errorRate: Math.round(er * 10_000) / 100,
       irb: Math.round(irb),
     };
     if (compareBinary) {

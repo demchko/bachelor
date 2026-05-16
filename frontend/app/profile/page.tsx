@@ -2,62 +2,193 @@
 
 import AppLayout from '@/app/components/AppLayout';
 import { useAuth } from '@/lib/auth-context';
+import { statsApi } from '@/lib/api';
+import { useQuery } from '@tanstack/react-query';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 
+const NAV_TILES = [
+  {
+    href: '/dashboard',
+    title: 'Головна панель',
+    desc: 'Огляд і статистика',
+    color: 'bg-slate-800',
+  },
+  {
+    href: '/generator',
+    title: 'Генератор ІКВ',
+    desc: 'Нові конфігурації',
+    color: 'bg-orange-500',
+  },
+  {
+    href: '/vector-codes',
+    title: 'Монолітні коди',
+    desc: 'Лабораторія',
+    color: 'bg-amber-600',
+  },
+  {
+    href: '/cyclic-codes',
+    title: 'Циклічні коди',
+    desc: 'Матриці H, G',
+    color: 'bg-indigo-600',
+  },
+  {
+    href: '/simulation',
+    title: 'Симуляція',
+    desc: 'BSC, порівняння',
+    color: 'bg-cyan-600',
+  },
+  {
+    href: '/theory',
+    title: 'Теорія',
+    desc: 'Матеріали курсу',
+    color: 'bg-emerald-600',
+  },
+  {
+    href: '/tests',
+    title: 'Тести',
+    desc: 'Перевірка знань',
+    color: 'bg-violet-600',
+  },
+];
+
 export default function ProfilePage() {
-  const { user, logout } = useAuth();
+  const { user, accessToken, logout } = useAuth();
   const router = useRouter();
+
+  const { data: stats, isLoading: statsLoading } = useQuery({
+    queryKey: ['stats-me', accessToken],
+    queryFn: () => statsApi.me(accessToken!),
+    enabled: !!accessToken,
+  });
 
   const handleLogout = async () => {
     await logout();
     router.push('/login');
   };
 
+  const initials =
+    user?.email
+      ?.split(/[@._-]/)
+      .filter(Boolean)
+      .slice(0, 2)
+      .map((s) => s[0]?.toUpperCase())
+      .join('') || 'U';
+
+  const lastActivity =
+    stats?.lastActivityAt &&
+    new Date(stats.lastActivityAt).toLocaleString('uk-UA', { dateStyle: 'medium', timeStyle: 'short' });
+
   return (
     <AppLayout>
-      <header className="bg-white border-b border-gray-200 px-8 py-5">
-        <h1 className="text-xl font-bold text-gray-900">Профіль</h1>
-        <p className="text-sm text-gray-500 mt-0.5">Управління обліковим записом</p>
+      <header className="bg-white border-b border-slate-200 px-6 sm:px-8 py-5">
+        <h1 className="text-xl font-bold text-slate-900">Профіль</h1>
+        <p className="text-sm text-slate-500 mt-1">
+          Обліковий запис, активність у IRB Explorer і швидкі переходи по всьому застосунку.
+        </p>
       </header>
 
-      <main className="flex-1 px-8 py-8 max-w-xl">
-        <div className="bg-white rounded-xl border border-gray-200 p-6 space-y-6">
-          {/* Avatar */}
-          <div className="flex items-center gap-4">
-            <div className="w-16 h-16 rounded-full bg-[#1a2332] flex items-center justify-center text-white text-xl font-bold">
-              {user?.email?.[0]?.toUpperCase() ?? 'U'}
+      <main className="flex-1 px-6 sm:px-8 py-8 max-w-5xl mx-auto w-full space-y-8">
+        <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm flex flex-col sm:flex-row sm:items-center gap-6">
+          <div className="flex h-20 w-20 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-slate-800 to-slate-900 text-2xl font-bold text-white">
+            {initials}
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-lg font-bold text-slate-900 truncate">{user?.email}</p>
+            <p className="text-sm text-slate-500 mt-0.5">Внутрішній ідентифікатор</p>
+            <p className="text-xs font-mono text-slate-400 mt-1 break-all">{user?.id}</p>
+          </div>
+          <div className="flex flex-col sm:items-end gap-2">
+            <Link
+              href="/dashboard"
+              className="inline-flex justify-center rounded-xl bg-orange-500 px-4 py-2.5 text-sm font-semibold text-white hover:bg-orange-600"
+            >
+              На головну панель
+            </Link>
+            <button
+              type="button"
+              onClick={handleLogout}
+              className="inline-flex justify-center rounded-xl border border-red-200 px-4 py-2 text-sm font-medium text-red-600 hover:bg-red-50"
+            >
+              Вийти
+            </button>
+          </div>
+        </div>
+
+        <div>
+          <h2 className="text-xs font-semibold uppercase tracking-widest text-slate-400 mb-3">Активність</h2>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+              <p className="text-xs text-slate-500 uppercase tracking-wide">Тестів пройдено</p>
+              <p className="text-2xl font-bold text-slate-900 mt-1 tabular-nums">
+                {statsLoading ? '…' : stats?.testsCompleted ?? 0}
+              </p>
+              <p className="text-xs text-slate-400 mt-1">
+                Найкращий бал: {stats?.bestTestScorePct != null ? `${stats.bestTestScorePct}%` : '—'}
+              </p>
             </div>
-            <div>
-              <p className="font-semibold text-gray-900">{user?.email}</p>
-              <p className="text-sm text-gray-400">Обліковий запис LPNU</p>
+            <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+              <p className="text-xs text-slate-500 uppercase tracking-wide">Конфігурацій</p>
+              <p className="text-2xl font-bold text-slate-900 mt-1 tabular-nums">
+                {statsLoading ? '…' : stats?.configsGenerated ?? 0}
+              </p>
+              <p className="text-xs text-slate-400 mt-1">Збережено: {stats?.configsSaved ?? 0}</p>
+            </div>
+            <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+              <p className="text-xs text-slate-500 uppercase tracking-wide">Симуляцій</p>
+              <p className="text-2xl font-bold text-slate-900 mt-1 tabular-nums">
+                {statsLoading ? '…' : stats?.simulationsRan ?? 0}
+              </p>
+              <p className="text-xs text-slate-400 mt-1">Запусків каналу</p>
+            </div>
+            <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+              <p className="text-xs text-slate-500 uppercase tracking-wide">Остання активність</p>
+              <p className="text-sm font-medium text-slate-800 mt-2">{lastActivity ?? '—'}</p>
+              <p className="text-xs text-slate-400 mt-1">За даними сервера</p>
             </div>
           </div>
+        </div>
 
-          <hr className="border-gray-100" />
-
-          {/* Info */}
-          <div className="space-y-3">
-            <div>
-              <label className="text-xs font-semibold uppercase tracking-widest text-gray-400">Email</label>
-              <p className="text-sm text-gray-900 mt-1">{user?.email}</p>
-            </div>
-            <div>
-              <label className="text-xs font-semibold uppercase tracking-widest text-gray-400">ID</label>
-              <p className="text-sm text-gray-400 font-mono mt-1">{user?.id}</p>
-            </div>
+        <div>
+          <h2 className="text-xs font-semibold uppercase tracking-widest text-slate-400 mb-3">Усі розділи</h2>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            {NAV_TILES.map((t) => (
+              <Link
+                key={t.href}
+                href={t.href}
+                className="group flex gap-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm transition hover:border-orange-200 hover:shadow-md"
+              >
+                <div className={`h-10 w-10 shrink-0 rounded-lg ${t.color} flex items-center justify-center text-white text-xs font-bold`}>
+                  →
+                </div>
+                <div>
+                  <p className="font-semibold text-slate-900 group-hover:text-orange-600">{t.title}</p>
+                  <p className="text-xs text-slate-500 mt-0.5">{t.desc}</p>
+                </div>
+              </Link>
+            ))}
           </div>
+        </div>
 
-          <hr className="border-gray-100" />
-
-          <button
-            onClick={handleLogout}
-            className="w-full flex items-center justify-center gap-2 border border-red-200 text-red-500 hover:bg-red-50 font-medium py-2.5 rounded-lg transition text-sm"
-          >
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-            </svg>
-            Вийти з системи
-          </button>
+        <div className="rounded-2xl border border-slate-200 bg-slate-50 p-6">
+          <h2 className="text-sm font-bold text-slate-900 mb-2">Безпека облікового запису</h2>
+          <p className="text-sm text-slate-600 leading-relaxed mb-4">
+            Пароль можна скинути через електронну пошту. Після зміни пароля увійдіть знову на всіх пристроях.
+          </p>
+          <div className="flex flex-wrap gap-2">
+            <Link
+              href="/forgot-password"
+              className="inline-flex rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-800 hover:bg-slate-100"
+            >
+              Забули пароль?
+            </Link>
+            <Link
+              href="/login"
+              className="inline-flex rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-800 hover:bg-slate-100"
+            >
+              Сторінка входу
+            </Link>
+          </div>
         </div>
       </main>
     </AppLayout>

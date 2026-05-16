@@ -13,7 +13,7 @@ interface NavItem {
 const navMain: NavItem[] = [
   {
     href: '/dashboard',
-    label: 'Dashboard',
+    label: 'Головна',
     icon: (
       <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zm10 0a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zm10 0a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
@@ -125,7 +125,7 @@ export default function Sidebar() {
   return (
     <aside className="w-64 min-h-screen bg-[#1a2332] flex flex-col flex-shrink-0">
       {/* Logo */}
-      <div className="flex items-center gap-3 px-5 py-5 border-b border-white/10">
+      <Link href="/dashboard" className="flex items-center gap-3 px-5 py-5 border-b border-white/10 hover:bg-white/5 transition-colors">
         <div className="w-9 h-9 bg-orange-500 rounded-lg flex items-center justify-center font-bold text-sm text-white flex-shrink-0">
           IR
         </div>
@@ -133,7 +133,7 @@ export default function Sidebar() {
           <p className="text-white font-semibold text-sm leading-tight">IRB Explorer</p>
           <p className="text-slate-500 text-xs">Lviv Polytechnic</p>
         </div>
-      </div>
+      </Link>
 
       {/* Navigation */}
       <nav className="flex-1 px-3 py-5 space-y-6 overflow-y-auto">
@@ -169,9 +169,10 @@ export default function Sidebar() {
         <div className="w-8 h-8 rounded-full bg-slate-600 flex items-center justify-center text-xs font-semibold text-white flex-shrink-0">
           {initials}
         </div>
-        <div className="flex-1 min-w-0">
-          <p className="text-sm text-white truncate">{user?.email ?? ''}</p>
-        </div>
+        <Link href="/profile" className="flex-1 min-w-0 group">
+          <p className="text-sm text-white truncate group-hover:text-orange-200 transition-colors">{user?.email ?? ''}</p>
+          <p className="text-[10px] text-slate-500 group-hover:text-slate-400">Профіль →</p>
+        </Link>
         <button
           onClick={handleLogout}
           title="Вийти"

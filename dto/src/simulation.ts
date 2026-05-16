@@ -7,7 +7,7 @@ export interface SimulationRequestDto {
   codeKind: CodeKind;
   /** Compare with binary uncoded transmission. */
   compareBinary?: boolean;
-  /** Compare with Reed-Solomon (255,223). */
+  /** Compare with Reed-Solomon (255,191) analytical baseline. */
   compareReedSolomon?: boolean;
   save?: boolean;
 }

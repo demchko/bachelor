@@ -1,4 +1,4 @@
-import { ArrayMaxSize, ArrayMinSize, IsArray, IsInt, IsString, Matches, Min } from 'class-validator';
+import { ArrayMaxSize, ArrayMinSize, IsArray, IsInt, IsString, Matches, Max, Min } from 'class-validator';
 
 export class EncodeDto {
   @IsArray()
@@ -6,6 +6,7 @@ export class EncodeDto {
   @ArrayMaxSize(20)
   @IsInt({ each: true })
   @Min(1, { each: true })
+  @Max(500, { each: true })
   sequence!: number[];
 
   @IsString()

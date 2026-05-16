@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useState, useEffect } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import AppLayout from '@/app/components/AppLayout';
@@ -162,6 +163,16 @@ export default function TestsPage() {
       </header>
 
       <main className="flex-1 px-8 py-8 max-w-3xl">
+        <div className="mb-6 flex flex-wrap items-center gap-2 rounded-xl border border-violet-100 bg-violet-50/80 px-4 py-3 text-sm text-violet-950">
+          <span className="font-medium">Підготовка:</span>
+          <Link href="/theory" className="font-semibold underline hover:no-underline">
+            теорія
+          </Link>
+          <span className="text-violet-700">·</span>
+          <Link href="/dashboard" className="font-semibold underline hover:no-underline">
+            панель
+          </Link>
+        </div>
         <div className="space-y-6">
           <div className="bg-white rounded-xl border border-gray-200 px-6 py-4 flex items-center gap-4">
             <div className="flex-1 bg-gray-100 rounded-full h-2">
